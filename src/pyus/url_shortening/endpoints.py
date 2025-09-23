@@ -41,7 +41,8 @@ async def create(
     responses={404: UrlNotFound},
 )
 async def get(
-    short_code: str, session: AsyncReadSession = Depends(get_db_read_session)
+    short_code: str,
+    session: AsyncReadSession = Depends(get_db_read_session),
 ) -> ShortenedUrl:
     """Get a Shortened URL by its short code."""
     url = await url_service.get(session, short_code)
