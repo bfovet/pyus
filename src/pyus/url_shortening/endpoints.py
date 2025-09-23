@@ -4,6 +4,7 @@ from pyus.exceptions import ResourceNotFound
 from pyus.kit.db.sqlite import AsyncReadSession, AsyncSession
 from pyus.models.url import ShortenedUrl
 from pyus.openapi import APITag
+from pyus.redis import Redis, get_redis
 from pyus.sqlite import get_db_read_session, get_db_session
 from pyus.url_shortening.schemas import ShortenedUrl as ShortenedUrlSchema
 from pyus.url_shortening.schemas import ShortenedUrlCreate
@@ -25,10 +26,12 @@ UrlNotFound = {
     responses={201: {"description": "Shortened URL created."}},
 )
 async def create(
-    url_create: ShortenedUrlCreate, session: AsyncSession = Depends(get_db_session)
+    url_create: ShortenedUrlCreate,
+    session: AsyncSession = Depends(get_db_session),
+    redis: Redis = Depends(get_redis),
 ) -> ShortenedUrl:
     """Create a shortened URL."""
-    return await url_service.create(session, url_create)
+    return await url_service.create(session, redis, url_create)
 
 
 @router.get(
