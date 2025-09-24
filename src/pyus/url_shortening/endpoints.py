@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 
-from pyus.exceptions import ResourceNotFound
+from pyus.exceptions import ResourceExpired, ResourceNotFound
 from pyus.kit.db.sqlite import AsyncReadSession, AsyncSession
 from pyus.models.url import ShortenedUrl
 from pyus.openapi import APITag
@@ -15,6 +15,11 @@ router = APIRouter(prefix="/urls", tags=["urls", APITag.public])
 UrlNotFound = {
     "description": "URL not found.",
     "model": ResourceNotFound.schema(),
+}
+
+UrlExpired = {
+    "description": "URL has expired.",
+    "model": ResourceExpired.schema(),
 }
 
 
@@ -41,7 +46,8 @@ async def create(
     responses={404: UrlNotFound},
 )
 async def get(
-    short_code: str, session: AsyncReadSession = Depends(get_db_read_session)
+    short_code: str,
+    session: AsyncReadSession = Depends(get_db_read_session),
 ) -> ShortenedUrl:
     """Get a Shortened URL by its short code."""
     url = await url_service.get(session, short_code)

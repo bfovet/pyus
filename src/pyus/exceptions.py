@@ -48,3 +48,8 @@ class InternalServerError(PyusError):
 class ResourceNotFound(PyusError):
     def __init__(self, message: str = "Not found", status_code: int = 404) -> None:
         super().__init__(message, status_code)
+
+
+class ResourceExpired(PyusError):
+    def __init__(self, message: str = "Expired", status_code: int = 410) -> None:
+        super().__init__(message, status_code)
