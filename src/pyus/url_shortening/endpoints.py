@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 
-from pyus.exceptions import ResourceNotFound
+from pyus.exceptions import ResourceExpired, ResourceNotFound
 from pyus.kit.db.sqlite import AsyncReadSession, AsyncSession
 from pyus.models.url import ShortenedUrl
 from pyus.openapi import APITag
@@ -15,6 +15,11 @@ router = APIRouter(prefix="/urls", tags=["urls", APITag.public])
 UrlNotFound = {
     "description": "URL not found.",
     "model": ResourceNotFound.schema(),
+}
+
+UrlExpired = {
+    "description": "URL has expired.",
+    "model": ResourceExpired.schema(),
 }
 
 
