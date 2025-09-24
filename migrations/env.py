@@ -8,6 +8,7 @@ from alembic import context
 
 from pyus.config import settings
 from pyus.models import Model
+from pyus.models.url import ShortenedUrl
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -22,7 +23,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = Model.metadata
+target_metadata = ShortenedUrl.metadata
 
 config.set_main_option("sqlalchemy.url", settings.SQLITE_HOST)
 
