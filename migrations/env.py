@@ -7,7 +7,6 @@ from sqlalchemy import pool
 from alembic import context
 
 from pyus.config import settings
-from pyus.models import Model
 from pyus.models.url import ShortenedUrl
 
 # this is the Alembic Config object, which provides

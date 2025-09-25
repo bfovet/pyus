@@ -1,9 +1,12 @@
 from typing import Any, NewType, TypeAlias
 
+from sqlalchemy import Engine
+from sqlalchemy import create_engine as _create_engine
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 AsyncReadSession = NewType("AsyncReadSession", _AsyncSession)
 """
@@ -46,9 +49,36 @@ def create_async_engine(
     )
 
 
+def create_sync_engine(
+    *,
+    dsn: str,
+    application_name: str | None = None,
+    debug: bool = False,
+    check_same_thread: bool = False,
+) -> Engine:
+    connect_args: dict[str, Any] = {}
+    # if application_name is not None:
+    #     connect_args["server_settings"] = {"application_name": application_name}
+    if check_same_thread is not None:
+        connect_args["check_same_thread"] = check_same_thread
+
+    return _create_engine(
+        dsn,
+        echo=debug,
+        connect_args=connect_args,
+    )
+
+
 AsyncSessionMaker: TypeAlias = async_sessionmaker[AsyncSession]
 AsyncReadSessionMaker: TypeAlias = async_sessionmaker[AsyncReadSession]
 
 
 def create_async_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, autocommit=False, autoflush=False)  # pyright: ignore[reportReturnType]
+
+
+SyncSessionMaker: TypeAlias = sessionmaker[Session]
+
+
+def create_sync_sessionmaker(engine: Engine) -> sessionmaker[Session]:
+    return sessionmaker(engine, expire_on_commit=False)

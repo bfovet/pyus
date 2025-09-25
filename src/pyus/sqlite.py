@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 from typing import Literal, TypeAlias
 
 from fastapi import Request
+from sqlalchemy import Engine
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from pyus.config import settings
@@ -13,6 +14,7 @@ from pyus.kit.db.sqlite import (
     AsyncSessionMaker,
 )
 from pyus.kit.db.sqlite import create_async_engine as _create_async_engine
+from pyus.kit.db.sqlite import create_sync_engine as _create_sync_engine
 
 ProcessName: TypeAlias = Literal["app", "worker", "scheduler", "script"]
 
@@ -29,6 +31,15 @@ def create_async_engine(process_name: ProcessName) -> AsyncEngine:
 def create_async_read_engine(process_name: ProcessName) -> AsyncEngine:
     return _create_async_engine(
         dsn=settings.SQLITE_HOST,
+        application_name=f"development.{process_name}",
+        debug=True,
+        check_same_thread=False,
+    )
+
+
+def create_sync_engine(process_name: ProcessName) -> Engine:
+    return _create_sync_engine(
+        dsn=settings.SYNC_SQLITE_HOST,
         application_name=f"development.{process_name}",
         debug=True,
         check_same_thread=False,
@@ -83,6 +94,7 @@ __all__ = [
     "AsyncReadSession",
     "create_async_engine",
     "create_async_read_engine",
+    "create_sync_engine",
     "get_db_session",
     "get_db_read_session",
     "get_db_sessionmaker",

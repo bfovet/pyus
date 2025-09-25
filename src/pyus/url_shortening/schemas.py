@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from pydantic import UUID4, Field, HttpUrl, field_validator
 
 from pyus.kit.schemas import IDSchema, Schema, TimestampedSchema
@@ -6,8 +7,7 @@ from pyus.kit.schemas import IDSchema, Schema, TimestampedSchema
 
 class ShortenedUrlBase(TimestampedSchema, IDSchema):
     expires_at: datetime | None = Field(
-        description="Expiration date of the URL.",
-        default=None
+        description="Expiration date of the URL.", default=None
     )
     id: UUID4 = Field(description="The ID of the URL.")
     original_url: HttpUrl = Field(description="Original URL.")
@@ -20,8 +20,7 @@ class ShortenedUrl(ShortenedUrlBase):
 class ShortenedUrlCreate(Schema):
     original_url: HttpUrl = Field(description="Original URL.")
     expires_at: datetime | None = Field(
-        description="Expiration date of the URL.",
-        default=None
+        description="Expiration date of the URL.", default=None
     )
 
     @field_validator("original_url", mode="after")

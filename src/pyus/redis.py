@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING, Literal, TypeAlias
 
+import redis.asyncio as _async_redis
 from fastapi import Request
 from redis import ConnectionError, RedisError, TimeoutError
-import redis.asyncio as _async_redis
 from redis.asyncio.retry import Retry
 from redis.backoff import default_backoff
 

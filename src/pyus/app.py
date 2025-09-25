@@ -4,9 +4,17 @@ from typing import AsyncIterator, TypedDict
 from fastapi import FastAPI
 
 from pyus.api import router
-from pyus.kit.db.sqlite import AsyncEngine, AsyncSessionMaker, create_async_sessionmaker
+from pyus.config import settings
+from pyus.kit.db.sqlite import (
+    AsyncEngine,
+    AsyncSessionMaker,
+    Engine,
+    SyncSessionMaker,
+    create_async_sessionmaker,
+    create_sync_sessionmaker,
+)
 from pyus.redis import Redis, create_redis
-from pyus.sqlite import AsyncSessionMiddleware, create_async_engine
+from pyus.sqlite import AsyncSessionMiddleware, create_async_engine, create_sync_engine
 
 
 class State(TypedDict):
@@ -14,6 +22,8 @@ class State(TypedDict):
     async_sessionmaker: AsyncSessionMaker
     async_read_engine: AsyncEngine
     async_read_sessionmaker: AsyncSessionMaker
+    sync_engine: Engine
+    sync_sessionmaker: SyncSessionMaker
 
     redis: Redis
 
@@ -27,6 +37,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
         async_engine
     )
 
+    sync_engine = create_sync_engine("app")
+    sync_sessionmaker = create_sync_sessionmaker(sync_engine)
+
     redis = create_redis("app")
 
     yield {
@@ -34,6 +47,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
         "async_sessionmaker": async_sessionmaker,
         "async_read_engine": async_read_engine,
         "async_read_sessionmaker": async_read_sessionmaker,
+        "sync_engine": sync_engine,
+        "sync_sessionmaker": sync_sessionmaker,
         "redis": redis,
     }
 
@@ -41,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     await async_engine.dispose()
     if async_read_engine is not async_engine:
         await async_read_engine.dispose()
+    sync_engine.dispose()
 
     print("pyus API stopped")
 
@@ -48,7 +64,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
 def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
 
-    app.add_middleware(AsyncSessionMiddleware)
+    if not settings.is_testing():
+        app.add_middleware(AsyncSessionMiddleware)
 
     app.include_router(router)
 

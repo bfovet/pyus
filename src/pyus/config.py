@@ -1,9 +1,23 @@
+from enum import StrEnum
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
+class Environment(StrEnum):
+    development = "development"
+    testing = "testing"
+    sandbox = "sandbox"
+    production = "production"
+
+
+env = Environment(os.getenv("PYUS_ENV", Environment.development))
 env_file = ".env"
 
 
 class Settings(BaseSettings):
+    ENV: Environment = Environment.development
+    TESTING: bool = False
+
     # Database
     SQLITE_USER: str = "pyus"
     SQLITE_PWD: str = "pyus"
@@ -27,6 +41,15 @@ class Settings(BaseSettings):
     @property
     def redis_url(self) -> str:
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+
+    def is_environment(self, environments: set[Environment]) -> bool:
+        return self.ENV in environments
+
+    def is_development(self) -> bool:
+        return self.is_environment({Environment.development})
+
+    def is_testing(self) -> bool:
+        return self.is_environment({Environment.testing})
 
 
 settings = Settings()

@@ -1,3 +1,5 @@
 from pyus.kit.db.models import Model, TimestampedModel
 
-__all__ = ["Model", "TimestampedModel"]
+from pyus.models.url import ShortenedUrl
+
+__all__ = ["Model", "TimestampedModel", "ShortenedUrl"]
