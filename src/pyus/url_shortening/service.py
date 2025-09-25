@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pyus.kit.db.sqlite import AsyncReadSession, AsyncSession
 from pyus.kit.id import generate_short_code
 from pyus.models.url import ShortenedUrl
@@ -7,14 +9,17 @@ from pyus.url_shortening.schemas import ShortenedUrlCreate
 
 
 class ShortenedUrlService:
-    async def get(
+    async def get_by_id(
+        self, session: AsyncReadSession, id: UUID
+    ) -> ShortenedUrl | None:
+        repository = ShortenedUrlRepository.from_session(session)
+        return await repository.get_by_id(id)
+
+    async def get_by_short_code(
         self, session: AsyncReadSession, short_code: str
     ) -> ShortenedUrl | None:
         repository = ShortenedUrlRepository.from_session(session)
-        statement = repository.get_base_statement().where(
-            ShortenedUrl.short_code == short_code
-        )
-        return await repository.get_one_or_none(statement)
+        return await repository.get_by_short_code(short_code)
 
     async def create(
         self, session: AsyncSession, redis: Redis, create_schema: ShortenedUrlCreate

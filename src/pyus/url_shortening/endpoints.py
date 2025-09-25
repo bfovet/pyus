@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 
 from pyus.exceptions import ResourceExpired, ResourceNotFound
@@ -40,17 +42,17 @@ async def create(
 
 
 @router.get(
-    "/{short_code}",
+    "/{id}",
     summary="Get Shortened URL",
     response_model=ShortenedUrlSchema,
     responses={404: UrlNotFound},
 )
 async def get(
-    short_code: str,
+    id: str,
     session: AsyncReadSession = Depends(get_db_read_session),
 ) -> ShortenedUrl:
     """Get a Shortened URL by its short code."""
-    url = await url_service.get(session, short_code)
+    url = await url_service.get_by_id(session, UUID(id))
 
     if url is None:
         raise ResourceNotFound()

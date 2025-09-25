@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 import pytest_asyncio
@@ -16,6 +17,7 @@ async def create_url(
     short_code: str = "ABC1234",
 ):
     url = ShortenedUrl(
+        id=uuid.uuid4(),
         expires_at=expires_at or utc_now() + relativedelta(years=1),
         original_url=original_url,
         short_code=short_code,

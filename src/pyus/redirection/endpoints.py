@@ -29,7 +29,7 @@ async def redirect(
     if (cached_url := await redis.get(short_code)) is not None:
         return cached_url
 
-    url = await url_service.get(session, short_code)
+    url = await url_service.get_by_short_code(session, short_code)
 
     if url is None:
         raise ResourceNotFound()

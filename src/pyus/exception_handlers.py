@@ -1,11 +1,17 @@
 from urllib.parse import urlencode
+
 from fastapi import FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from pyus.config import settings
-from pyus.exceptions import PyusRedirectionError, PyusRequestValidationError, PyusError, ResourceNotModified
+from pyus.exceptions import (
+    PyusError,
+    PyusRedirectionError,
+    PyusRequestValidationError,
+    ResourceNotModified,
+)
 
 
 async def pyus_exception_handler(request: Request, exc: PyusError) -> JSONResponse:
