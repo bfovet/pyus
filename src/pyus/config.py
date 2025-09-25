@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     ENV: Environment = Environment.development
     TESTING: bool = False
 
+    # URL to frontend app.
+    FRONTEND_BASE_URL: str = "http://127.0.0.1:3000"
+    FRONTEND_DEFAULT_RETURN_PATH: str = "/"
+
     # Database
     SQLITE_USER: str = "pyus"
     SQLITE_PWD: str = "pyus"
@@ -50,6 +54,9 @@ class Settings(BaseSettings):
 
     def is_testing(self) -> bool:
         return self.is_environment({Environment.testing})
+
+    def generate_frontend_url(self, path: str) -> str:
+        return f"{self.FRONTEND_BASE_URL}{path}"
 
 
 settings = Settings()

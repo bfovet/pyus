@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from pyus.api import router
 from pyus.config import settings
+from pyus.exception_handlers import add_exception_handlers
 from pyus.kit.db.sqlite import (
     AsyncEngine,
     AsyncSessionMaker,
@@ -66,6 +67,8 @@ def create_app() -> FastAPI:
 
     if not settings.is_testing():
         app.add_middleware(AsyncSessionMiddleware)
+
+    add_exception_handlers(app)
 
     app.include_router(router)
 

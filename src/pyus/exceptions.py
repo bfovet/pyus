@@ -1,6 +1,8 @@
-from typing import Literal
+from typing import Any, Literal, LiteralString, NotRequired, Sequence, TypedDict
 
 from pydantic import BaseModel, Field, create_model
+from pydantic_core import ErrorDetails, InitErrorDetails, PydanticCustomError
+from pydantic_core import ValidationError as PydanticValidationError
 
 
 class PyusError(Exception):
@@ -38,6 +40,24 @@ class PyusError(Exception):
         )
 
 
+class PyusRedirectionError(PyusError):
+    """
+    Exception class for errors
+    that should be displayed nicely to the user through our UI.
+
+    A specific exception handler will redirect to `/error` page in the client app.
+
+    Args:
+        return_to: Target URL of the *Go back* button on the error page.
+    """
+
+    def __init__(
+        self, message: str, status_code: int = 400, return_to: str | None = None
+    ) -> None:
+        self.return_to = return_to
+        super().__init__(message, status_code)
+
+
 class InternalServerError(PyusError):
     def __init__(
         self, message: str = "Internal Server Error", status_code: int = 500
@@ -50,6 +70,43 @@ class ResourceNotFound(PyusError):
         super().__init__(message, status_code)
 
 
+class ResourceNotModified(Exception):
+    # Handled separately to avoid any content being returned
+    """304 Not Modified."""
+
+    def __init__(self) -> None:
+        self.status_code = 304
+
+
 class ResourceExpired(PyusError):
     def __init__(self, message: str = "Expired", status_code: int = 410) -> None:
         super().__init__(message, status_code)
+
+
+class ValidationError(TypedDict):
+    loc: tuple[int | str, ...]
+    msg: LiteralString
+    type: LiteralString
+    input: Any
+    ctx: NotRequired[dict[str, Any]]
+    url: NotRequired[str]
+
+
+class PyusRequestValidationError(PyusError):
+    def __init__(self, errors: Sequence[ValidationError]) -> None:
+        self._errors = errors
+
+    def errors(self) -> list[ErrorDetails]:
+        pydantic_errors: list[InitErrorDetails] = []
+        for error in self._errors:
+            pydantic_errors.append(
+                {
+                    "type": PydanticCustomError(error["type"], error["msg"]),
+                    "loc": error["loc"],
+                    "input": error["input"],
+                }
+            )
+        pydantic_error = PydanticValidationError.from_exception_data(
+            self.__class__.__name__, pydantic_errors
+        )
+        return pydantic_error.errors()
