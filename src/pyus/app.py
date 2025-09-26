@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from pyus.api import router
 from pyus.kit.db.sqlite import AsyncEngine, AsyncSessionMaker, create_async_sessionmaker
+from pyus.opentelemetry import instrument_fastapi, instrument_httpx, instrument_sqlalchemy
 from pyus.redis import Redis, create_redis
 from pyus.sqlite import AsyncSessionMiddleware, create_async_engine
 
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     async_sessionmaker = async_read_sessionmaker = create_async_sessionmaker(
         async_engine
     )
+    instrument_sqlalchemy(async_engine.sync_engine)
 
     redis = create_redis("app")
 
@@ -56,3 +58,5 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+instrument_fastapi(app)
+instrument_httpx()
