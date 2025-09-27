@@ -14,6 +14,7 @@ class ShortenedUrlService:
         statement = repository.get_base_statement().where(
             ShortenedUrl.short_code == short_code
         )
+
         return await repository.get_one_or_none(statement)
 
     async def create(

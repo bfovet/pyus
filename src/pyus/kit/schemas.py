@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from pydantic import UUID4, BaseModel, ConfigDict, Field
+from pydantic import UUID4, AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class Schema(BaseModel):
@@ -17,7 +15,7 @@ class IDSchema(Schema):
 
 
 class TimestampedSchema(Schema):
-    created_at: datetime = Field(description="Creation timestamp of the object.")
-    modified_at: datetime | None = Field(
+    created_at: AwareDatetime = Field(description="Creation timestamp of the object.")
+    modified_at: AwareDatetime | None = Field(
         description="Last modification timestamp of the object."
     )
