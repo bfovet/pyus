@@ -2,17 +2,62 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI
+from opentelemetry import baggage, trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import set_tracer_provider
 from sqlalchemy import Engine
+
+from pyus.config import settings
+from pyus.redis import Redis
 
 
 def add_trace_context(
     logger: Any, method_name: str, event_dict: dict[str, Any]
 ) -> dict[str, Any]:
     """Add OpenTelemetry trace context to log records"""
+    span = trace.get_current_span()
+    if span and span.is_recording():
+        span_ctx = span.get_span_context()
+        event_dict["trace_id"] = f"{span_ctx.trace_id:032x}"
+        event_dict["span_id"] = f"{span_ctx.span_id:016x}"
+
+    baggage_ctx = baggage.get_all()
+    if baggage_ctx:
+        event_dict["baggage"] = baggage_ctx
+
     return event_dict
+
+
+def setup_tracing() -> TracerProvider:
+    tracer_provider = TracerProvider(
+        resource=Resource.create(
+            {
+                SERVICE_NAME: "pyus",
+                SERVICE_VERSION: "0.1.0",
+                "environment": settings.ENV,
+            }
+        )
+    )
+    set_tracer_provider(tracer_provider)
+
+    span_exporter = OTLPSpanExporter()
+
+    span_processor = BatchSpanProcessor(span_exporter)
+    tracer_provider.add_span_processor(span_processor)
+
+    return tracer_provider
+
+
+def get_tracer(name: str = "pyus") -> trace.Tracer:
+    """Get a tracer instance"""
+    return trace.get_tracer(name)
 
 
 def instrument_httpx(client: httpx.AsyncClient | httpx.Client | None = None) -> None:
@@ -26,3 +71,7 @@ def instrument_fastapi(app: FastAPI) -> None:
 
 def instrument_sqlalchemy(engine: Engine) -> None:
     SQLAlchemyInstrumentor().instrument(engine=engine)
+
+
+def instrument_redis(redis: Redis) -> None:
+    RedisInstrumentor().instrument_client(redis)

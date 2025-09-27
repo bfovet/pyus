@@ -2,17 +2,20 @@ from datetime import timezone
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import RedirectResponse
+from opentelemetry import baggage
 
 from pyus.exceptions import ResourceExpired, ResourceNotFound
 from pyus.kit.db.sqlite import AsyncReadSession
 from pyus.kit.utils import utc_now
 from pyus.logging import get_logger
 from pyus.openapi import APITag
+from pyus.opentelemetry import get_tracer
 from pyus.redis import Redis, get_redis
 from pyus.sqlite import get_db_read_session
 from pyus.url_shortening.endpoints import UrlExpired, UrlNotFound
 from pyus.url_shortening.service import url as url_service
 
+tracer = get_tracer(__name__)
 logger = get_logger(__name__)
 
 
@@ -32,45 +35,101 @@ async def redirect(
     redis: Redis = Depends(get_redis),
 ) -> str:
     """Redirect to an original URL by its short code."""
-    logger.info(
-        "Processing redirection request", short_code=short_code, endpoint="redirect"
-    )
 
-    if (cached_url := await redis.get(short_code)) is not None:
+    ctx = baggage.set_baggage("endpoint", "redirect")
+    ctx = baggage.set_baggage("operation", "url_redirection", ctx)
+
+    with tracer.start_as_current_span(
+        f"GET /{short_code}",
+        context=ctx,
+        attributes={
+            "http.method": "GET",
+            "http.route": "/{short_code}",
+            "url.short_code": short_code,
+        },
+    ) as span:
         logger.info(
-            "Cache hit for redirection", short_code=short_code, original_url=cached_url
+            "Processing redirection request", short_code=short_code, endpoint="redirect"
         )
-        return cached_url
 
-    logger.info("Cache miss for redirection", short_code=short_code)
+        cached_url: str | None = None
+        with tracer.start_as_current_span("redis_cache_lookup") as cache_span:
+            if (cached_url := await redis.get(short_code)) is not None:
+                cache_span.set_attributes(
+                    {"cache.hit": cached_url is not None, "cache.key": short_code}
+                )
+                logger.info(
+                    "Cache hit for redirection",
+                    short_code=short_code,
+                    original_url=cached_url,
+                )
+            else:
+                logger.info("Cache miss for redirection", short_code=short_code)
 
-    url = await url_service.get(session, short_code)
+        if cached_url is not None:
+            span.set_attributes(
+                {"http.status_code": 302, "url.original": cached_url, "cache.hit": True}
+            )
 
-    if url is None:
-        logger.warning("URL not found for redirection", short_code=short_code)
-        raise ResourceNotFound()
+            return cached_url
 
-    # FIXME(bf, 2025-09-27): url.expires_at should be
-    # timezone-aware but does not seem to be
-    url.expires_at = url.expires_at.replace(tzinfo=timezone.utc)
+        with tracer.start_as_current_span("database_lookup") as db_span:
+            url = await url_service.get(session, short_code)
+            db_span.set_attributes(
+                {"db.operation": "select", "url.found": url is not None}
+            )
 
-    if url.expires_at is not None and utc_now() >= url.expires_at:
-        logger.warning(
-            "URL expired for redirection",
+        if url is None:
+            span.set_attribute("http.status_code", 404)
+            logger.warning("URL not found for redirection", short_code=short_code)
+            raise ResourceNotFound()
+
+        # FIXME(bf, 2025-09-27): url.expires_at should be
+        # timezone-aware but does not seem to be
+        url.expires_at = url.expires_at.replace(tzinfo=timezone.utc)
+
+        if url.expires_at is not None and utc_now() >= url.expires_at:
+            span.set_attributes(
+                {
+                    "http.status_code": 410,
+                    "url.expired": True,
+                    "url.expires_at": url.expires_at.isoformat(),
+                }
+            )
+            logger.warning(
+                "URL expired for redirection",
+                short_code=short_code,
+                expires_at=url.expires_at.isoformat(),
+            )
+            raise ResourceExpired()
+
+        with tracer.start_as_current_span("cache_url") as cache_span:
+            ex = (url.expires_at - utc_now()) if url.expires_at is not None else 3600
+            await redis.set(url.short_code, url.original_url, ex=ex)
+            cache_span.set_attributes(
+                {
+                    "cache.key": url.short_code,
+                    "cache.ttl": 3600,  # TODO: actually store the ttl
+                }
+            )
+            logger.info(
+                "URL cached for future redirections", short_code=short_code, ttl=ex
+            )
+
+        span.set_attributes(
+            {
+                "http.status_code": 302,
+                "url.id": str(url.id),
+                "url.original": url.original_url,
+                "cache.hit": False,
+            }
+        )
+
+        logger.info(
+            "Redirection completed successfully",
             short_code=short_code,
-            expires_at=url.expires_at.isoformat(),
+            url_id=str(url.id),
+            original_url=url.original_url,
         )
-        raise ResourceExpired()
 
-    ex = (url.expires_at - utc_now()) if url.expires_at is not None else 3600
-    await redis.set(url.short_code, url.original_url, ex=ex)
-    logger.info("URL cached for future redirections", short_code=short_code, ttl=ex)
-
-    logger.info(
-        "Redirection completed successfully",
-        short_code=short_code,
-        url_id=str(url.id),
-        original_url=url.original_url,
-    )
-
-    return url.original_url
+        return url.original_url

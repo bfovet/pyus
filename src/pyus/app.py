@@ -10,7 +10,9 @@ from pyus.logging import get_logger
 from pyus.opentelemetry import (
     instrument_fastapi,
     instrument_httpx,
+    instrument_redis,
     instrument_sqlalchemy,
+    setup_tracing,
 )
 from pyus.redis import Redis, create_redis
 from pyus.sqlite import AsyncSessionMiddleware, create_async_engine
@@ -38,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     instrument_sqlalchemy(async_engine.sync_engine)
 
     redis = create_redis("app")
+    instrument_redis(redis)
 
     logger.info("Pyus API started")
 
@@ -68,6 +71,7 @@ def create_app() -> FastAPI:
 
 
 configure_logging()
+setup_tracing()
 
 app = create_app()
 instrument_fastapi(app)
