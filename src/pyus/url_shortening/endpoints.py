@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, status
 from opentelemetry import baggage
+from opentelemetry.metrics import Counter
 
 from pyus.exceptions import ResourceExpired, ResourceNotFound
 from pyus.kit.db.sqlite import AsyncReadSession, AsyncSession
 from pyus.logging import get_logger
 from pyus.models.url import ShortenedUrl
 from pyus.openapi import APITag
-from pyus.opentelemetry import get_tracer
+from pyus.opentelemetry import get_meter, get_tracer
 from pyus.redis import Redis, get_redis
 from pyus.sqlite import get_db_read_session, get_db_session
 from pyus.url_shortening.schemas import ShortenedUrl as ShortenedUrlSchema
@@ -14,6 +15,7 @@ from pyus.url_shortening.schemas import ShortenedUrlCreate
 from pyus.url_shortening.service import url as url_service
 
 tracer = get_tracer(__name__)
+meter = get_meter(__name__)
 logger = get_logger(__name__)
 
 
@@ -28,6 +30,13 @@ UrlExpired = {
     "description": "URL has expired.",
     "model": ResourceExpired.schema(),
 }
+
+
+endpoint_requests_counter: Counter = meter.create_counter(
+    name="endpoint_requests_total",
+    description="Total number of endpoint requests",
+    unit="1"
+)
 
 
 @router.post(
@@ -67,6 +76,15 @@ async def create(
         )
 
         result = await url_service.create(session, redis, url_create)
+
+        endpoint_requests_counter.add(
+            1,
+            attributes={
+                "method": "POST",
+                "endpoint": "/urls",
+                "status": "success"
+            }
+        )
 
         span.set_attributes(
             {
@@ -116,9 +134,26 @@ async def get(
         url = await url_service.get(session, short_code)
 
         if url is None:
+            endpoint_requests_counter.add(
+                1,
+                attributes={
+                    "method": "GET",
+                    "endpoint": "/urls/{short_code}",
+                    "status": "not_found"
+                }
+            )
             span.set_attribute("http.status_code", 404)
             logger.warning("URL not found", short_code=short_code)
             raise ResourceNotFound()
+
+        endpoint_requests_counter.add(
+            1,
+            attributes={
+                "method": "GET",
+                "endpoint": "/urls/{short_code}",
+                "status": "success"
+            }
+        )
 
         span.set_attributes(
             {

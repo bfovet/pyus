@@ -2,12 +2,16 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI
-from opentelemetry import baggage, trace
+from opentelemetry import baggage, trace, metrics
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.metrics import set_meter_provider
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -55,9 +59,37 @@ def setup_tracing() -> TracerProvider:
     return tracer_provider
 
 
+def setup_metrics() -> MeterProvider:
+    metric_exporter = OTLPMetricExporter()
+
+    metric_reader = PeriodicExportingMetricReader(
+        exporter=metric_exporter,
+        export_interval_millis=10000,
+    )
+
+    meter_provider = MeterProvider(
+        resource=Resource.create(
+            {
+                SERVICE_NAME: "pyus",
+                SERVICE_VERSION: "0.1.0",
+                "environment": settings.ENV,
+            }
+        ),
+        metric_readers=[metric_reader]
+    )
+    set_meter_provider(meter_provider)
+
+    return meter_provider
+
+
 def get_tracer(name: str = "pyus") -> trace.Tracer:
     """Get a tracer instance"""
     return trace.get_tracer(name)
+
+
+def get_meter(name: str = "pyus") -> metrics.Meter:
+    """Get a meter instance"""
+    return metrics.get_meter(name)
 
 
 def instrument_httpx(client: httpx.AsyncClient | httpx.Client | None = None) -> None:

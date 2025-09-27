@@ -12,6 +12,7 @@ from pyus.opentelemetry import (
     instrument_httpx,
     instrument_redis,
     instrument_sqlalchemy,
+    setup_metrics,
     setup_tracing,
 )
 from pyus.redis import Redis, create_redis
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
 
 configure_logging()
 setup_tracing()
+setup_metrics()
 
 app = create_app()
 instrument_fastapi(app)
